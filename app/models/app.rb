@@ -23,7 +23,6 @@ class App
     pre_processed: true,
     default: ->{ BSON::ObjectId.new.to_s }
 
-
   embeds_many :watchers
   embeds_many :deploys
   embeds_one :issue_tracker, :class_name => 'IssueTracker'
@@ -48,6 +47,14 @@ class App
   accepts_nested_attributes_for :notification_service, :allow_destroy => true,
     :reject_if => proc { |attrs| !NotificationService.subclasses.map(&:to_s).include?(attrs[:type].to_s) }
 
+  scope :watched_by, ->(user) do
+    where watchers: { "$elemMatch" => { "user_id" => user.id } }
+  end
+
+  def watched_by?(user)
+    watchers.pluck("user_id").include? user.id
+  end
+
   # Acceps a hash with the following attributes:
   #
   # * <tt>:error_class</tt> - the class of error (required to create a new Problem)
@@ -57,8 +64,14 @@ class App
   def find_or_create_err!(attrs)
     Err.where(
       :fingerprint => attrs[:fingerprint]
-    ).first ||
-      problems.create!(attrs.slice(:error_class, :environment)).errs.create!(attrs.slice(:fingerprint, :problem_id))
+    ).first || (
+      problem = problems.create!(
+        error_class: attrs[:error_class],
+        environment: attrs[:environment],
+        app_name: name
+      )
+      problem.errs.create!(attrs.slice(:fingerprint, :problem_id))
+    )
   end
 
   # Mongoid Bug: find(id) on association proxies returns an Enumerator
@@ -178,7 +191,9 @@ class App
   protected
 
     def store_cached_attributes_on_problems
-      problems.each(&:cache_app_attributes)
+      Problem.where(:app_id => id).update_all(
+        app_name: name
+      )
     end
 
     def generate_api_key
