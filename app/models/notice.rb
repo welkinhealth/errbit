@@ -103,6 +103,26 @@ class Notice
     request['session'] || {}
   end
 
+  def in_app_backtrace_lines
+    backtrace_lines.in_app
+  end
+
+  def similar_count
+    problem.notices_count
+  end
+
+  def emailable?
+    app.email_at_notices.include?(similar_count)
+  end
+
+  def should_email?
+    app.emailable? && emailable?
+  end
+
+  def should_notify?
+    app.notification_service.notify_at_notices.include?(0) || app.notification_service.notify_at_notices.include?(similar_count)
+  end
+
   ##
   # TODO: Move on decorator maybe
   #

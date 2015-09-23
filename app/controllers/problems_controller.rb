@@ -25,7 +25,7 @@ class ProblemsController < ApplicationController
   }
 
   expose(:all_errs) {
-    params[:all_errs]
+    params[:all_errs] || true
   }
 
   expose(:params_environement) {
